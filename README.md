@@ -1,27 +1,5 @@
 # Express Middleware Module Project
 
-In this challenge, you build an API and write custom middleware that satisfies the requirements listed under the `Minimum Viable Product` section.
-
-## Instructions
-
-### Task 1: Project Setup
-
-There are two possible ways to submit your project. Your instructor should have communicated which method to use for this project during the Guided Project and in your cohort's Slack channel. If you are still unsure, reach out to Lambda Staff.
-
-#### Option A - Codegrade
-
-- [x] Fork and clone the repository.
-- [x] Open the assignment in Canvas and click on the "Set up git" option.
-- [x] Follow instructions to set up Codegrade's Webhook and Deploy Key.
-- [x] Push your first commit: `git commit --allow-empty -m "first commit" && git push`.
-- [x] Check to see that Codegrade has accepted your git submission.
-
-#### Option B - Pull Request
-
-- [x] Fork and clone the repository.
-- [x] Implement your project in a `firstname-lastname` branch.
-- [x] Create a pull request of `firstname-lastname` against your `main` branch.
-- [x] Open the assignment in Canvas and submit your pull request.
 
 ### Task 2: Minimum Viable Product
 
@@ -60,7 +38,7 @@ There are two helper files that you can use to manage the persistence of _users_
 - `get()`: calling find returns a promise that resolves to an array of all the resources contained in the database.
 - `getById()`: takes an `id` as the argument and returns a promise that resolves to the resource with that id if found.
 - `insert()`: calling insert passing it a resource object will add it to the database and return the new resource.
-- `update()`: accepts two arguments, the first is the `id` of the resource to update and the second is an object with the `changes` to apply. On success it returns the updated record.
+- `update()`: accepts two arguments, the first is the `id` of the resource to update and the second is an object with the `changes` to apply. It returns the count of updated records. If the count is 1 it means the record was updated correctly.
 - `remove()`: the remove method accepts an `id` as it's first parameter and, upon successfully deleting the `resource` from the database, returns the number of records deleted.
 
 The `users-model.js` includes an extra method called `getUserPosts()` that when passed a user's `id`, returns a list of all the `posts` for the `user`.

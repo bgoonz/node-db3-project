@@ -1,9 +1,9 @@
 // require your server and launch it
-const port = 5000;
 const server = require('./api/server');
 
-const sayHello = () => {
-    console.log(`server is listening on port: ${port}`);
-}
-
-server.listen(port, sayHello);
+const port = 5000;
+const message = `Server Running: localhost:${port}`
+// START YOUR SERVER HERE
+server.listen(port, () => {
+    console.log(message)
+})
