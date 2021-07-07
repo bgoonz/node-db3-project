@@ -115,11 +115,6 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-# Mac files
 .DS_Store
-
-# VSCode settings
-.vscode/
-
-# testing db
+.vscode
 testing.db3

@@ -1,10 +1,23 @@
 const express = require('express');
+const cors = require('cors');
 
-const SchemeRouter = require('./schemes/scheme-router.js');
+const userRouter = require('./users/users-router')
 
 const server = express();
+const { logger } = require('./middleware/middleware');
 
-server.use(express.json());
-server.use('/api/schemes', SchemeRouter);
+// remember express by default cannot parse JSON in request bodies
+server.use(cors() );
+server.use(express.json() );
+
+// global middlewares and the user's router need to be connected here
+server.use(logger );
+
+// add the routers here
+server.use("/api/users", userRouter);
+
+server.get('/', (req, res) => {
+  res.send(`<h2>Let's write some middleware!</h2>`);
+});
 
 module.exports = server;
