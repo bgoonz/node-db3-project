@@ -1,9 +1,8 @@
 const request = require('supertest')
 const server = require('./api/server')
 const db = require('./data/db-config')
-
-const { users: initialUsers } = require('./data/seeds/02-users')
-const { posts: initialPosts } = require('./data/seeds/03-posts')
+const { schemes } = require('./data/seeds/01-schemes')
+const { steps } = require('./data/seeds/02-steps')
 
 beforeAll(async () => {
   await db.migrate.rollback()
@@ -21,131 +20,181 @@ test('[0] sanity check', () => {
 })
 
 describe('server.js', () => {
-  describe('[GET] /api/users', () => {
-    test('[1] can get the correct number of users', async () => {
-      let res = await request(server).get('/api/users')
-      expect(res.body).toHaveLength(initialUsers.length)
+  describe('[GET] /api/schemes', () => {
+    test('[1] gets all the schemes from db, including schemes _without_ steps (LEFT VS. INNER JOIN !!!)', async () => {
+      const res = await request(server).get('/api/schemes')
+      expect(res.body).toHaveLength(schemes.length)
     }, 500)
-    test('[2] can get all the correct users', async () => {
-      let res = await request(server).get('/api/users')
-      expect(res.body).toMatchObject(initialUsers)
+    test('[2] the schemes returned have a `scheme_id` key', async () => {
+      const res = await request(server).get('/api/schemes')
+      res.body.forEach((scheme) => {
+        expect(scheme).toHaveProperty('scheme_id')
+      })
+    }, 500)
+    test('[3] the schemes returned have a `scheme_name` key', async () => {
+      const res = await request(server).get('/api/schemes')
+      res.body.forEach((scheme) => {
+        expect(scheme).toHaveProperty('scheme_name')
+      })
+    }, 500)
+    test('[4] the schemes returned have a `number_of_steps` key', async () => {
+      const res = await request(server).get('/api/schemes')
+      res.body.forEach((scheme) => {
+        expect(scheme).toHaveProperty('number_of_steps')
+      })
+    }, 500)
+    test('[5] the schemes arrive sorted by `scheme_id` ascending', async () => {
+      const res = await request(server).get('/api/schemes')
+      res.body.forEach((scheme, idx) => {
+        expect(scheme.scheme_id).toBe(idx + 1)
+      })
+    }, 500)
+    test('[6] each scheme returned has the correct `number_of_steps`', async () => {
+      const res = await request(server).get('/api/schemes')
+      const stepCounts = [[1, 3], [2, 2], [3, 3], [4, 3], [5, 1], [6, 4], [7, 0]]
+      res.body.forEach((scheme) => {
+        const count = stepCounts.find(sc => sc[0] == scheme.scheme_id)[1]
+        expect(scheme.number_of_steps).toBe(count)
+      })
     }, 500)
   })
-  describe('[GET] /api/users/:id', () => {
-    test('[3] can get the correct user', async () => {
-      let res = await request(server).get('/api/users/1')
-      expect(res.body).toMatchObject(initialUsers[0])
-      expect(res.body).toHaveProperty('id')
-      res = await request(server).get('/api/users/2')
-      expect(res.body).toMatchObject(initialUsers[1])
-      expect(res.body).toHaveProperty('id')
+  describe('[GET] /api/schemes/:scheme_id', () => {
+    test('[7] the scheme returned has the correct `scheme_id` _number_', async () => {
+      const res = await request(server).get('/api/schemes/2')
+      expect(res.body).toHaveProperty('scheme_id', 2)
     }, 500)
-    test('[4] responds with a 404 if id does not exist', async () => {
-      let res = await request(server).get('/api/users/111')
+    test('[8] the scheme returned has the correct `scheme_name`', async () => {
+      const res = await request(server).get('/api/schemes/2')
+      expect(res.body).toHaveProperty('scheme_name', schemes[1].scheme_name)
+    }, 500)
+    test('[9] the scheme returned has a `steps` property which is an array', async () => {
+      const res = await request(server).get('/api/schemes/2')
+      expect(res.body.steps).toBeInstanceOf(Array)
+    }, 500)
+    test('[10] the scheme returned has an empty `steps` array if the scheme has no steps', async () => {
+      const res = await request(server).get('/api/schemes/7')
+      expect(res.body.steps).toBeInstanceOf(Array)
+      expect(res.body.steps).toHaveLength(0)
+    }, 500)
+    test('[11] the scheme returned has the correct number of steps', async () => {
+      const stepCounts = [[1, 3], [2, 2], [3, 3], [4, 3], [5, 1], [6, 4], [7, 0]]
+      for (let idx = 0; idx < stepCounts.length; idx++) {
+        const res = await request(server).get('/api/schemes/' + stepCounts[idx][0])
+        expect(res.body.steps).toHaveLength(stepCounts[idx][1])
+      }
+    }, 500)
+    test('[12] each step inside the scheme returned has `step_id`, `step_number` and `instructions` keys', async () => {
+      const res = await request(server).get('/api/schemes/2')
+      res.body.steps.forEach(st => {
+        expect(st).toHaveProperty('step_id')
+        expect(st).toHaveProperty('step_number')
+        expect(st).toHaveProperty('instructions')
+      })
+    }, 500)
+    test('[13] the steps inside the scheme returned are ordered by `step_number` ascending', async () => {
+      const res = await request(server).get('/api/schemes/2')
+      expect(res.body.steps).toMatchObject([
+        { step_number: 1, instructions: 'collect all the sheep in Scotland' },
+        { step_number: 2, instructions: 'profit' },
+      ])
+    }, 500)
+    test('[14] responds with 404 and proper error on non-existing `scheme_id`', async () => {
+      const res = await request(server).get('/api/schemes/222')
       expect(res.status).toBe(404)
-    })
-    test('[5] responds with the correct error message if id does not exist', async () => {
-      let res = await request(server).get('/api/users/111')
-      expect(res.body.message).toMatch(/not found/i)
+      expect(res.body).toHaveProperty('message', 'scheme with scheme_id 222 not found')
     }, 500)
   })
-  describe('[POST] /api/users', () => {
-    test('[6] creates a new user in the database', async () => {
-      await request(server).post('/api/users').send({ name: 'foo' })
-      let users = await db('users')
-      expect(users).toHaveLength(initialUsers.length + 1)
-      await request(server).post('/api/users').send({ name: 'bar' })
-      users = await db('users')
-      expect(users).toHaveLength(initialUsers.length + 2)
+  describe('[GET] /api/schemes/:scheme_id/steps', () => {
+    test('[15] returns the correct number of steps for a `scheme_id`', async () => {
+      const stepCounts = [[1, 3], [2, 2], [3, 3], [4, 3], [5, 1], [6, 4], [7, 0]]
+      for (let idx = 0; idx < stepCounts.length; idx++) {
+        const res = await request(server).get(`/api/schemes/${stepCounts[idx][0]}/steps`)
+        expect(res.body).toHaveLength(stepCounts[idx][1])
+      }
     }, 500)
-    test('[7] responds with the newly created user', async () => {
-      let res = await request(server).post('/api/users').send({ name: 'foo' })
-      expect(res.body).toMatchObject({ id: 10, name: 'foo' })
-      res = await request(server).post('/api/users').send({ name: 'bar' })
-      expect(res.body).toMatchObject({ id: 11, name: 'bar' })
+    test('[16] the steps returned are ordered by `step_number` ascending', async () => {
+      const res = await request(server).get('/api/schemes/2/steps')
+      expect(res.body[0]).toMatchObject(
+        { step_number: 1 },
+      )
+      expect(res.body[1]).toMatchObject(
+        { step_number: 2 },
+      )
     }, 500)
-    test('[8] responds with a 400 if missing name', async () => {
-      let res = await request(server).post('/api/users').send({ random: 'thing' })
+    test('[17] the steps returned have the proper `step_number`, `step_id`, `instructions` and `scheme_name`', async () => {
+      const res = await request(server).get('/api/schemes/5/steps')
+      expect(res.body[0]).toMatchObject(
+        { step_number: 1, instructions: 'quest and quest some more', scheme_name: 'Find the Holy Grail' },
+      )
+    }, 500)
+    test('[18] responds with 404 and proper error on non-existing `scheme_id`', async () => {
+      const res = await request(server).get('/api/schemes/222/steps')
+      expect(res.status).toBe(404)
+      expect(res.body).toHaveProperty('message', 'scheme with scheme_id 222 not found')
+    }, 500)
+  })
+  describe('[POST] /api/schemes', () => {
+    test('[19] can create a new scheme in the database', async () => {
+      await request(server).post('/api/schemes').send({ scheme_name: 'foo' })
+      const updatedSchemes = await db('schemes')
+      expect(updatedSchemes).toHaveLength(schemes.length + 1)
+    }, 500)
+    test('[20] responds with 201 status code', async () => {
+      const res = await request(server).post('/api/schemes').send({ scheme_name: 'foo' })
+      expect(res.status).toBe(201)
+    }, 500)
+    test('[21] responds with the newly created scheme record', async () => {
+      const res = await request(server).post('/api/schemes').send({ scheme_name: 'foo' })
+      expect(res.body).toHaveProperty('scheme_id', 8)
+      expect(res.body).toMatchObject({ scheme_name: 'foo' })
+    }, 500)
+    test('[22] responds with 400 and proper message on missing or bad `scheme_name`', async () => {
+      let res = await request(server).post('/api/schemes').send({ scheme_name: null })
       expect(res.status).toBe(400)
-    }, 500)
-    test('[9] responds with the correct error message if missing name', async () => {
-      let res = await request(server).post('/api/users').send({ random: 'thing' })
-      expect(res.body.message).toMatch(/missing required name/i)
-    }, 500)
-  })
-  describe('[PUT] /api/users/:id', () => {
-    test('[10] writes the updates in the database', async () => {
-      await request(server).put('/api/users/1').send({ name: 'FRODO BAGGINS' })
-      let users = await db('users')
-      expect(users[0]).toMatchObject({ id: 1, name: 'FRODO BAGGINS' })
-    }, 500)
-    test('[11] responds with the newly updated user', async () => {
-      let res = await request(server).put('/api/users/1').send({ name: 'FRODO BAGGINS' })
-      expect(res.body).toMatchObject({ id: 1, name: 'FRODO BAGGINS' })
-    }, 500)
-    test('[12] responds with a 404 if user id does not exist', async () => {
-      let res = await request(server).put('/api/users/111').send({ name: 'FRODO BAGGINS' })
-      expect(res.status).toBe(404)
-    }, 500)
-    test('[13] responds with a 400 if missing name', async () => {
-      let res = await request(server).put('/api/users/1').send({ no: 'FRODO BAGGINS' })
+      expect(res.body).toHaveProperty('message', 'invalid scheme_name')
+      res = await request(server).post('/api/schemes').send({})
       expect(res.status).toBe(400)
-    }, 500)
-    test('[14] responds with the correct error message if missing name', async () => {
-      let res = await request(server).put('/api/users/1').send({ no: 'FRODO BAGGINS' })
-      expect(res.body.message).toMatch(/missing required name/i)
-    }, 500)
-  })
-  describe('[DELETE] /api/users/:id', () => {
-    test('[15] deletes the user from the database', async () => {
-      await request(server).delete('/api/users/1')
-      let users = await db('users')
-      expect(users[0]).toMatchObject({ name: 'Samwise Gamgee' })
-    }, 500)
-    test('[16] responds with the newly deleted user', async () => {
-      let res = await request(server).delete('/api/users/1')
-      expect(res.body).toMatchObject({ id: 1, name: 'Frodo Baggins' })
-    }, 500)
-    test('[17] responds with a 404 if user id does not exist', async () => {
-      let res = await request(server).delete('/api/users/111')
-      expect(res.status).toBe(404)
-    }, 500)
-  })
-  describe('[GET] /api/users/:id/posts', () => {
-    test('[18] gets the correct number of user posts', async () => {
-      const res = await request(server).get('/api/users/1/posts')
-      expect(res.body).toHaveLength(initialPosts.filter(p => p.user_id == 1).length)
-    }, 500)
-    test('[19] responds with a 404 if user id does not exist', async () => {
-      const res = await request(server).get('/api/users/111/posts')
-      expect(res.status).toBe(404)
-    }, 500)
-  })
-  describe('[POST] /api/users/:id/posts', () => {
-    test('[20] creates a new user post in the database', async () => {
-      await request(server).post('/api/users/1/posts').send({ text: 'foo' })
-      let posts = await db('posts').where('user_id', 1)
-      expect(posts).toHaveLength(initialPosts.filter(p => p.user_id == 1).length + 1)
-      await request(server).post('/api/users/1/posts').send({ text: 'bar' })
-      posts = await db('posts').where('user_id', 1)
-      expect(posts).toHaveLength(initialPosts.filter(p => p.user_id == 1).length + 2)
-    }, 500)
-    test('[21] responds with the newly created user post', async () => {
-      let res = await request(server).post('/api/users/1/posts').send({ text: 'foo' })
-      expect(res.body).toHaveProperty('id')
-      expect(res.body).toMatchObject({ text: 'foo' })
-    }, 500)
-    test('[22] responds with a 404 if user id does not exist', async () => {
-      let res = await request(server).post('/api/users/111/posts').send({ text: 'foo' })
-      expect(res.status).toBe(404)
-    }, 500)
-    test('[23] responds with a 400 if missing text', async () => {
-      let res = await request(server).post('/api/users/1/posts').send({ no: 'foo' })
+      expect(res.body).toHaveProperty('message', 'invalid scheme_name')
+      res = await request(server).post('/api/schemes').send({ scheme_name: 7 })
       expect(res.status).toBe(400)
+      expect(res.body).toHaveProperty('message', 'invalid scheme_name')
     }, 500)
-    test('[24] responds with the correct error message if missing text', async () => {
-      let res = await request(server).post('/api/users/1/posts').send({ no: 'foo' })
-      expect(res.body.message).toMatch(/missing required text/i)
+  })
+  describe('[POST] /api/schemes/:scheme_id/steps', () => {
+    test('[23] can create a new step in the database', async () => {
+      await request(server).post('/api/schemes/7/steps').send({ instructions: 'foo', step_number: 60 })
+      const updatedSteps = await db('steps')
+      expect(updatedSteps).toHaveLength(steps.length + 1)
+    }, 500)
+    test('[24] responds with 201 status code', async () => {
+      const res = await request(server).post('/api/schemes/7/steps').send({ instructions: 'foo', step_number: 60 })
+      expect(res.status).toBe(201)
+    }, 500)
+    test('[25] responds with the complete list of steps for the given `scheme_id` including the new one', async () => {
+      let res = await request(server).post('/api/schemes/7/steps').send({ instructions: 'foo', step_number: 60 })
+      expect(res.body).toHaveLength(1)
+      res = await request(server).post('/api/schemes/7/steps').send({ instructions: 'bar', step_number: 61 })
+      expect(res.body).toHaveLength(2)
+    }, 500)
+    test('[26] responds with well formed steps ordered by `step_number` ascending', async () => {
+      let res = await request(server).post('/api/schemes/7/steps').send({ instructions: 'bar', step_number: 20 })
+      expect(res.body).toMatchObject([{ instructions: 'bar', step_number: 20 }])
+      res = await request(server).post('/api/schemes/7/steps').send({ instructions: 'foo', step_number: 10 })
+      expect(res.body).toMatchObject([{ instructions: 'foo', step_number: 10 }, { instructions: 'bar', step_number: 20 }])
+    }, 500)
+    test('[27] responds with 400 and proper message on missing or bad `step_number` or `instructions`', async () => {
+      let res = await request(server).post('/api/schemes/7/steps').send({ instructions: null, step_number: 20 })
+      expect(res.status).toBe(400)
+      expect(res.body).toHaveProperty('message', 'invalid step')
+      res = await request(server).post('/api/schemes/7/steps').send({ instructions: 'foo', step_number: 'bar' })
+      expect(res.status).toBe(400)
+      expect(res.body).toHaveProperty('message', 'invalid step')
+      res = await request(server).post('/api/schemes/7/steps').send({ step_number: 20 })
+      expect(res.status).toBe(400)
+      expect(res.body).toHaveProperty('message', 'invalid step')
+      res = await request(server).post('/api/schemes/7/steps').send({ instructions: 'foo', step_number: -1 })
+      expect(res.status).toBe(400)
+      expect(res.body).toHaveProperty('message', 'invalid step')
     }, 500)
   })
 })

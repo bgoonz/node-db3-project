@@ -1,21 +1,27 @@
 const express = require('express');
+
+const SchemeRouter = require('./schemes/scheme-router.js');
+
 const server = express();
-const userRouter = require('./users/users-router');
-const {
-    logger
-} = require('./middleware/middleware');
 
-//json parser
 server.use(express.json());
+server.use('/api/schemes', SchemeRouter);
 
-// global middlewares and the user's router need to be connected here
-server.use(logger);
-server.use('/api/users', userRouter)
+server.use('*', (req, res) => {
+    res.status(404).json({ message: "no such endpoint" })
+})
 
+server.use((err, req, res, next) => {
+    const status = err.status || 500;
+    res.status(status).json({
+        message: err.message,
+        sageAdvice: 'Finding the real error is 90% of the bug fix',
+        stack: err.stack
+    })
 
+    if (status === -1) {
+        next();
+    }
+})
 
-//server set up
-server.get('/', (req, res) => {
-    res.send(`<h2>Let's write some middleware!</h2>`);
-});
 module.exports = server;

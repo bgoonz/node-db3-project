@@ -1,3 +1,4 @@
+// DO NOT CHANGE THIS FILE
 const sharedConfig = {
   client: 'sqlite3',
   useNullAsDefault: true,
@@ -7,6 +8,7 @@ const sharedConfig = {
   seeds: {
     directory: './data/seeds',
   },
+  // this enables foreign keys in SQLite
   pool: {
     afterCreate: (conn, done) => {
       conn.run('PRAGMA foreign_keys = ON', done)
@@ -17,7 +19,7 @@ const sharedConfig = {
 module.exports = {
   development: {
     ...sharedConfig,
-    connection: { filename: './data/lambda.db3' },
+    connection: { filename: './data/schemes.db3' },
   },
   testing: {
     ...sharedConfig,
